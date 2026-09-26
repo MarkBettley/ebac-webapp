@@ -28,16 +28,26 @@ public class UsuarioController {
     FeignUserService feignUserService;
 
     @RequestMapping(value = "/usuario", method = RequestMethod.GET)
-    public Object informacionUsuario(HttpServletRequest request, HttpServletResponse response, Model model) {
+    public Object informacionUsuario(HttpServletRequest request,
+                                     HttpServletResponse response,
+                                     Model model) {
+
         String idUsuario = request.getParameter("idUsuario");
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.setViewName("usuario");
+
         Usuario usuario = Usuario.creaUsuarioVacio();
 
         if (!Objects.isNull(idUsuario) && !idUsuario.isEmpty()) {
-            ResponseWrapper<Usuario> usuarioResponse = feignUserService.getUserById(Integer.parseInt(idUsuario));
-            if (usuarioResponse.isSuccess()) {
-                usuario = usuarioResponse.getResponseEntity().getBody();
+            try {
+                ResponseWrapper<Usuario> usuarioResponse =
+                        feignUserService.getUserById(Integer.parseInt(idUsuario));
+
+                if (usuarioResponse != null && usuarioResponse.isSuccess()) {
+                    usuario = usuarioResponse.getResponseEntity().getBody();
+                }
+            } catch (NumberFormatException e) {
+                log.warn("Id de usuario invalido: {}", idUsuario);
             }
         }
 
@@ -46,36 +56,63 @@ public class UsuarioController {
     }
 
     @RequestMapping(value = "/formulario-usuario", method = RequestMethod.GET)
-    public Object formularioUsuario(HttpServletRequest request, HttpServletResponse response, Model model) {
+    public Object formularioUsuario(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    Model model) {
+
         String idUsuario = request.getParameter("idUsuario");
+
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.setViewName("formulario-usuario");
 
         Usuario usuario = Usuario.creaUsuarioVacio();
-        Telefono telefono = usuario.getTelefonos().get(0);
+        List<Telefono> telefonos = new ArrayList<>(usuario.getTelefonos());
+
         model.addAttribute("propositoFormulario", "Crear usuario");
 
         if (!Objects.isNull(idUsuario) && !idUsuario.isEmpty()) {
-            ResponseWrapper<Usuario> usuarioResponse = feignUserService.getUserById(Integer.parseInt(idUsuario));
-            if (usuarioResponse.isSuccess()) {
-                usuario = usuarioResponse.getResponseEntity().getBody();
-                // Solo extraemos el primer telefono (En caso de tener)
-                // Actividad sugerida: Generar funcionalidad para retornar todos los telefonos en caso de tener mas de 1 y generar el formulario correspondiente
-                if (usuario.getTelefonos().size() > 0) {
-                    telefono = usuario.getTelefonos().get(0);
+            try {
+                ResponseWrapper<Usuario> usuarioResponse =
+                        feignUserService.getUserById(Integer.parseInt(idUsuario));
+
+                if (usuarioResponse != null
+                        && usuarioResponse.isSuccess()
+                        && usuarioResponse.getResponseEntity() != null
+                        && usuarioResponse.getResponseEntity().getBody() != null) {
+
+                    usuario = usuarioResponse.getResponseEntity().getBody();
+
+                    if (usuario.getTelefonos() != null
+                            && !usuario.getTelefonos().isEmpty()) {
+                        telefonos = usuario.getTelefonos();
+                    } else {
+                        telefonos = new ArrayList<>();
+                        telefonos.add(Telefono.builder()
+                                .tipoTelefono("")
+                                .lada(0)
+                                .numero("")
+                                .build());
+                    }
+
+                    model.addAttribute(
+                            "propositoFormulario",
+                            "Actualizar usuario");
                 }
-                model.addAttribute("propositoFormulario", "Actualizar usuario");
+            } catch (NumberFormatException e) {
+                log.warn("Id de usuario invalido: {}", idUsuario);
             }
         }
 
         model.addAttribute("usuario", usuario);
-        model.addAttribute("telefono", telefono);
+        model.addAttribute("telefonos", telefonos);
+
         return modelAndView;
     }
 
     @RequestMapping(value = "/guardar-usuario", method = RequestMethod.POST)
-    public ResponseEntity<Response> saveUserConfiguration(HttpServletRequest request) {
-        log.info("Guardando información de Walmart para usuario {}", request.getParameter("GPSServerUser"));
+    public ResponseEntity<Response> saveUserConfiguration(
+            HttpServletRequest request) {
+
         HttpStatus statusCode = HttpStatus.OK;
         Response response = null;
 
@@ -83,44 +120,154 @@ public class UsuarioController {
             String usuarioId = request.getParameter("FormUsuarioId");
             String usuarioNombre = request.getParameter("FormUsuarioNombre");
             String usuarioEdad = request.getParameter("FormUsuarioEdad");
-            String telefonoTipo = request.getParameter("FormTelefonoTipo");
-            String telefonoLada = request.getParameter("FormTelefonoLada");
-            String telefonoNumero = request.getParameter("FormTelefonoNumero");
 
-            // Validar informacion recibida
-            // ...
+            String[] telefonoTipos =
+                    request.getParameterValues("FormTelefonoTipo");
+            String[] telefonoLadas =
+                    request.getParameterValues("FormTelefonoLada");
+            String[] telefonoNumeros =
+                    request.getParameterValues("FormTelefonoNumero");
 
-            // Si el usuarioId tiene informacion se trata de una actualizacion por lo tanto seteamos el id recibido
-            Usuario.UsuarioBuilder usuarioBuilder = Usuario.builder();
-            if (!usuarioId.equals("0")) {
-                usuarioBuilder = usuarioBuilder.idUsuario(Integer.parseInt(usuarioId));
+            ErrorResponse errores = new ErrorResponse();
+
+            if (usuarioNombre == null || usuarioNombre.isBlank()) {
+                errores.addMessage("Nombre");
             }
 
-            // En caso de haber agregado la funcionalidad para editar mas de 1 telefono, esta seccion se debera adecuar
-            // para recibir todos los telefonos y realizar el guardado/actualizacion
+            int edad = 0;
 
-            //Generamos el telefono recibido
-            Telefono telefono = Telefono.builder()
-                    .tipoTelefono(telefonoTipo)
-                    .lada(Integer.parseInt(telefonoLada))
-                    .numero(telefonoNumero)
-                    .build();
-            //Generamos el usuario
+            try {
+                edad = Integer.parseInt(usuarioEdad);
+                if (edad < 18) {
+                    errores.addMessage("Edad debe ser mayor o igual a 18");
+                }
+            } catch (Exception e) {
+                errores.addMessage("Edad");
+            }
+
+            if (telefonoTipos == null
+                    || telefonoLadas == null
+                    || telefonoNumeros == null
+                    || telefonoTipos.length == 0
+                    || telefonoTipos.length != telefonoLadas.length
+                    || telefonoTipos.length != telefonoNumeros.length) {
+
+                errores.addMessage("Telefonos");
+            }
+
+            List<Telefono> telefonos = new ArrayList<>();
+
+            if (telefonoTipos != null
+                    && telefonoLadas != null
+                    && telefonoNumeros != null
+                    && telefonoTipos.length == telefonoLadas.length
+                    && telefonoTipos.length == telefonoNumeros.length) {
+
+                for (int i = 0; i < telefonoTipos.length; i++) {
+
+                    String tipo = telefonoTipos[i];
+                    String ladaTexto = telefonoLadas[i];
+                    String numero = telefonoNumeros[i];
+
+                    if (tipo == null || tipo.isBlank()) {
+                        errores.addMessage(
+                                "Tipo de telefono " + (i + 1));
+                        continue;
+                    }
+
+                    if (numero == null || numero.isBlank()) {
+                        errores.addMessage(
+                                "Numero de telefono " + (i + 1));
+                        continue;
+                    }
+
+                    int lada;
+
+                    try {
+                        lada = Integer.parseInt(ladaTexto);
+                    } catch (Exception e) {
+                        errores.addMessage(
+                                "Lada del telefono " + (i + 1));
+                        continue;
+                    }
+
+                    telefonos.add(
+                            Telefono.builder()
+                                    .tipoTelefono(tipo.trim())
+                                    .lada(lada)
+                                    .numero(numero.trim())
+                                    .build());
+                }
+            }
+
+            if (!errores.getMessages().isEmpty()) {
+                return new ResponseEntity<>(
+                        errores,
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            Usuario.UsuarioBuilder usuarioBuilder = Usuario.builder();
+
+            int id = 0;
+
+            try {
+                id = Integer.parseInt(usuarioId);
+            } catch (Exception ignored) {
+            }
+
+            if (id > 0) {
+                usuarioBuilder.idUsuario(id);
+            }
+
             Usuario usuario = usuarioBuilder
-                    .nombre(usuarioNombre)
-                    .edad(Integer.parseInt(usuarioEdad))
-                    .telefonos(List.of(telefono))
+                    .nombre(usuarioNombre.trim())
+                    .edad(edad)
+                    .telefonos(telefonos)
                     .build();
 
-            ResponseWrapper<Usuario> user = feignUserService.createUser(usuario);
-            if (!user.isSuccess()) {
+            ResponseWrapper<Usuario> user;
+
+            if (id > 0) {
+                user = feignUserService.updateUser(id, usuario);
+            } else {
+                user = feignUserService.createUser(usuario);
+            }
+
+            if (user == null || !user.isSuccess()) {
                 ErrorResponse errorResponse = new ErrorResponse();
-                errorResponse.addMessage(user.getMessage());
+
+                if (user != null && user.getMessage() != null) {
+                    errorResponse.addMessage(user.getMessage());
+                } else {
+                    errorResponse.addMessage(
+                            "No fue posible guardar el usuario");
+                }
+
                 response = errorResponse;
 
-                statusCode = HttpStatus.resolve(user.getResponseEntity().getStatusCodeValue());
+                if (user != null
+                        && user.getResponseEntity() != null) {
+
+                    HttpStatus apiStatus = HttpStatus.resolve(
+                            user.getResponseEntity().getStatusCodeValue());
+
+                    if (apiStatus != null) {
+                        statusCode = apiStatus;
+                    } else {
+                        statusCode = HttpStatus.BAD_REQUEST;
+                    }
+                } else {
+                    statusCode = HttpStatus.BAD_REQUEST;
+                }
             }
-        } catch(Exception e) {
+
+        } catch (Exception e) {
+            log.error("Error al guardar usuario", e);
+
+            ErrorResponse errorResponse = new ErrorResponse();
+            errorResponse.addMessage("Datos invalidos");
+
+            response = errorResponse;
             statusCode = HttpStatus.BAD_REQUEST;
         }
 

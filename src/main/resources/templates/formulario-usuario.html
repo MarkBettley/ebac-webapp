@@ -40,24 +40,53 @@
                                                        id="FormUsuarioEdad" type="text"
                                                        th:value="${usuario.edad}">
                                             </div>
-                                            <div class="form-group">
-                                                <label for="FormTelefonoTipo">Tipo telefono</label>
-                                                <input class="form-control" name="FormTelefonoTipo"
-                                                       id="FormTelefonoTipo" type="text"
-                                                       th:value="${telefono.tipoTelefono}">
+                                            <div id="telefonos-container">
+                                                <div class="telefono-item"
+                                                     th:each="telefono, estado : ${telefonos}">
+                                                    <hr th:if="${estado.index > 0}">
+                                                    <h4>
+                                                        Teléfono
+                                                        <span th:text="${estado.index + 1}"></span>
+                                                    </h4>
+
+                                                    <div class="form-group">
+                                                        <label>Tipo teléfono</label>
+                                                        <input class="form-control"
+                                                               name="FormTelefonoTipo"
+                                                               type="text"
+                                                               th:value="${telefono.tipoTelefono}">
+                                                    </div>
+
+                                                    <div class="form-group">
+                                                        <label>Lada</label>
+                                                        <input class="form-control"
+                                                               name="FormTelefonoLada"
+                                                               type="text"
+                                                               th:value="${telefono.lada}">
+                                                    </div>
+
+                                                    <div class="form-group">
+                                                        <label>Número</label>
+                                                        <input class="form-control"
+                                                               name="FormTelefonoNumero"
+                                                               type="text"
+                                                               th:value="${telefono.numero}">
+                                                    </div>
+
+                                                    <button type="button"
+                                                            class="btn btn-danger btn-sm eliminarTelefono">
+                                                        Eliminar teléfono
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div class="form-group">
-                                                <label for="FormTelefonoLada">Lada</label>
-                                                <input class="form-control" name="FormTelefonoLada"
-                                                       id="FormTelefonoLada" type="text"
-                                                       th:value="${telefono.lada}">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="FormTelefonoNumero">N&uacute;mero</label>
-                                                <input class="form-control" name="FormTelefonoNumero"
-                                                       id="FormTelefonoNumero" type="text"
-                                                       th:value="${telefono.numero}">
-                                            </div>
+
+                                            <br>
+                                            <button type="button"
+                                                    id="agregarTelefono"
+                                                    class="btn btn-success">
+                                                Agregar teléfono
+                                            </button>
+
                                             <div class="form-group">
                                                 <input name="FormUsuarioId"
                                                        id="FormUsuarioId" type="hidden"
@@ -94,45 +123,129 @@
 <!-- /#wrapper -->
 <footer th:replace="base :: common_footer(~{::script})">
     <script type="text/javascript">
-            $(document).ready(function() {
+        $(document).ready(function() {
+
+            $("#errorModalMessage").hide();
+            $("#successModalMessage").hide();
+
+            function actualizarTitulos() {
+                $(".telefono-item").each(function(index) {
+                    $(this).find("h4").text("Teléfono " + (index + 1));
+                });
+            }
+
+            $("#agregarTelefono").click(function() {
+                var nuevoTelefono = `
+                    <div class="telefono-item">
+                        <hr>
+                        <h4>Teléfono</h4>
+
+                        <div class="form-group">
+                            <label>Tipo teléfono</label>
+                            <input class="form-control"
+                                   name="FormTelefonoTipo"
+                                   type="text">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Lada</label>
+                            <input class="form-control"
+                                   name="FormTelefonoLada"
+                                   type="text">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Número</label>
+                            <input class="form-control"
+                                   name="FormTelefonoNumero"
+                                   type="text">
+                        </div>
+
+                        <button type="button"
+                                class="btn btn-danger btn-sm eliminarTelefono">
+                            Eliminar teléfono
+                        </button>
+                    </div>
+                `;
+
+                $("#telefonos-container").append(nuevoTelefono);
+                actualizarTitulos();
+            });
+
+            $(document).on("click", ".eliminarTelefono", function() {
+                if ($(".telefono-item").length > 1) {
+                    $(this).closest(".telefono-item").remove();
+                    actualizarTitulos();
+                }
+            });
+
+            $("#guardarUsuario").click(function() {
+
                 $("#errorModalMessage").hide();
                 $("#successModalMessage").hide();
 
-                //if submit button is clicked
-                $('#guardarUsuario').click(function() {
-                    $("#errorModalMessage").hide();
-                    $("#successModalMessage").hide();
+                var datos = {
+                    FormUsuarioId:
+                        $("input[name=FormUsuarioId]").val(),
 
-                    //Get the data from all the fields
-                    var FormUsuarioId = $('input[name=FormUsuarioId]').val();
-                    var FormUsuarioNombre = $('input[name=FormUsuarioNombre]').val();
-                    var FormUsuarioEdad = $('input[name=FormUsuarioEdad]').val();
-                    var FormTelefonoTipo = $('input[name=FormTelefonoTipo]').val();
-                    var FormTelefonoLada = $('input[name=FormTelefonoLada]').val();
-                    var FormTelefonoNumero = $('input[name=FormTelefonoNumero]').val();
+                    FormUsuarioNombre:
+                        $("input[name=FormUsuarioNombre]").val(),
 
-                    $.ajax({
-                        type: "POST",
-                        data: {"FormUsuarioId": FormUsuarioId, "FormUsuarioNombre": FormUsuarioNombre, "FormUsuarioEdad": FormUsuarioEdad,
-                                "FormTelefonoTipo": FormTelefonoTipo, "FormTelefonoLada": FormTelefonoLada, "FormTelefonoNumero": FormTelefonoNumero},
-                        url: "/guardar-usuario",
-                        success: function(){
-                            $("#successMessage").text("Usuario guardado correctamente.");
-                            $("#successModalMessage").show();
-                            console.log("Usuario creado con exito");
-                        },
-                        error: function(XMLHttpRequest, textStatus, errorThrown) {
-                            if(XMLHttpRequest.responseJSON.messages != null) {
-                                $("#errorMessage").text("ERROR en los siguientes campos: " + XMLHttpRequest.responseJSON.messages);
-                            } else {
-                                $("#errorMessage").text("Ocurrio un error al GUARDAR el usuario, consulte al Administrador.");
-                            }
-                            $("#errorModalMessage").show();
-                            console.log("Error");
+                    FormUsuarioEdad:
+                        $("input[name=FormUsuarioEdad]").val(),
+
+                    FormTelefonoTipo:
+                        $("input[name=FormTelefonoTipo]").map(function() {
+                            return $(this).val();
+                        }).get(),
+
+                    FormTelefonoLada:
+                        $("input[name=FormTelefonoLada]").map(function() {
+                            return $(this).val();
+                        }).get(),
+
+                    FormTelefonoNumero:
+                        $("input[name=FormTelefonoNumero]").map(function() {
+                            return $(this).val();
+                        }).get()
+                };
+
+                $.ajax({
+                    type: "POST",
+                    traditional: true,
+                    data: datos,
+                    url: "/guardar-usuario",
+
+                    success: function() {
+                        $("#successMessage")
+                            .text("Usuario guardado correctamente.");
+
+                        $("#successModalMessage").show();
+                    },
+
+                    error: function(XMLHttpRequest) {
+
+                        if (XMLHttpRequest.responseJSON
+                            && XMLHttpRequest.responseJSON.messages) {
+
+                            $("#errorMessage").text(
+                                "ERROR en los siguientes campos: " +
+                                XMLHttpRequest.responseJSON.messages.join(", ")
+                            );
+
+                        } else {
+                            $("#errorMessage").text(
+                                "Ocurrió un error al guardar el usuario."
+                            );
                         }
-                    });
-                 });
+
+                        $("#errorModalMessage").show();
+                    }
+                });
             });
+
+            actualizarTitulos();
+        });
     </script>
 </footer>
 </body>

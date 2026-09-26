@@ -1,5 +1,6 @@
 package com.ebac.modulo45.controller;
 
+import com.ebac.modulo45.service.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -15,25 +16,42 @@ import java.io.IOException;
 @RestController
 public class LoginController {
 
+    private final LoginService loginService;
+
+    public LoginController(LoginService loginService) {
+        this.loginService = loginService;
+    }
+
     @RequestMapping(value = "/login", method = RequestMethod.POST)
-    public Object login(HttpServletRequest request, HttpServletResponse response, Model model) throws IOException {
+    public Object login(HttpServletRequest request,
+                        HttpServletResponse response,
+                        Model model) throws IOException {
+
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.setViewName("pagina-login");
 
         String username = request.getParameter("username");
         String password = request.getParameter("password");
 
-        // Actividad sugerida, validar el usuario y el password contra una tabla en la DB
-        if (username.equals("salvador") && password.equals("123")) {
+        if (loginService.validarCredenciales(username, password)) {
+            log.info("Inicio de sesion exitoso para {}", username);
             request.getSession().setAttribute("username", username);
             response.sendRedirect("/");
+            return modelAndView;
         }
+
+        log.warn("Credenciales invalidas para {}", username);
+        model.addAttribute(
+                "loginError",
+                "Usuario o contraseña incorrectos");
 
         return modelAndView;
     }
 
     @RequestMapping(value = "/logout", method = RequestMethod.GET)
-    public Object logout(HttpServletRequest request, HttpServletResponse response) {
+    public Object logout(HttpServletRequest request,
+                         HttpServletResponse response) {
+
         ModelAndView modelAndView = new ModelAndView();
         modelAndView.setViewName("pagina-login");
 
